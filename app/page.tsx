@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, BarChart3, Plus } from "lucide-react"
+import { Calendar, BarChart3, Plus, X, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export type MoodEntry = {
@@ -14,7 +14,7 @@ export type MoodEntry = {
 }
 
 const CuteMoodTracker = () => {
-  const [currentView, setCurrentView] = useState<"record" | "calendar" | "analytics">("record")
+  const [currentView, setCurrentView] = useState<"record" | "calendar" | "analytics" | "view">("record")
   const [selectedMood, setSelectedMood] = useState(3)
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([])
   const [notes, setNotes] = useState("")
@@ -23,6 +23,7 @@ const CuteMoodTracker = () => {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [recordingDate, setRecordingDate] = useState(new Date())
+  const [viewingEntry, setViewingEntry] = useState<MoodEntry | null>(null)
 
   // 可愛幾何形狀心情配置
   const moodOptions = [
@@ -127,7 +128,7 @@ const CuteMoodTracker = () => {
         moodName: moodOption.name,
         date: dateStr, // 使用本地時間格式化的日期
         timestamp: new Date().toISOString(),
-        notes,
+        notes: notes.trim() || undefined, // 確保空字符串不被保存
       }
 
       const updated = [...moodHistory.filter((entry) => entry.date !== newEntry.date), newEntry]
@@ -313,6 +314,97 @@ const CuteMoodTracker = () => {
     }
   }
 
+  // 查看記錄頁面
+  if (currentView === "view" && viewingEntry) {
+    const entryConfig = moodOptions.find((m) => m.id === viewingEntry.mood)!
+    const entryDate = new Date(viewingEntry.date)
+
+    return (
+      <div
+        className={`min-h-screen bg-gradient-to-br ${entryConfig.bgGradient} text-white transition-all duration-1000 safe-area-inset`}
+      >
+        <div className="flex flex-col items-center justify-center px-6 space-y-8 py-20 min-h-screen">
+          {/* 返回按鈕 */}
+          <button
+            onClick={() => setCurrentView("calendar")}
+            className="absolute top-8 left-4 p-2 bg-white/20 rounded-full backdrop-blur-sm hover:bg-white/30 transition-all"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          <div className="text-center">
+            <h2 className="text-xl font-bold">
+              {entryDate.toLocaleDateString("zh-TW", {
+                month: "long",
+                day: "numeric",
+              })}
+              的心情記錄
+            </h2>
+            <p className="text-white/70 text-sm mt-1">
+              {entryDate.toLocaleDateString("zh-TW", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                weekday: "long",
+              })}
+            </p>
+            <p className="text-white/50 text-xs mt-1">
+              記錄於 {new Date(viewingEntry.timestamp).toLocaleString("zh-TW")}
+            </p>
+          </div>
+
+          <div className="relative">
+            <CuteShape shape={entryConfig.shape} color={entryConfig.color} size={140} glowing={true} />
+
+            <div className="absolute -inset-6">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-1.5 h-1.5 bg-white/30 rounded-full animate-float-particles"
+                  style={{
+                    left: `${20 + i * 15}%`,
+                    top: `${10 + (i % 3) * 30}%`,
+                    animationDelay: `${i * 0.5}s`,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <h3 className="text-2xl font-bold">{entryConfig.name}</h3>
+
+          {/* 顯示筆記 */}
+          {viewingEntry.notes && (
+            <div className="w-full max-w-xs">
+              <div className="bg-white/10 border border-white/20 rounded-xl p-4 backdrop-blur-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  
+                  
+                </div>
+                <p className="text-white text-sm leading-relaxed">{viewingEntry.notes}</p>
+              </div>
+            </div>
+          )}
+
+          {!viewingEntry.notes && (
+            <div className="w-full max-w-xs">
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+                <p className="text-white/50 text-sm">當時沒有留下文字記錄</p>
+              </div>
+            </div>
+          )}
+
+          <Button
+            onClick={() => setCurrentView("calendar")}
+            className="w-full max-w-xs py-3 bg-white/20 hover:bg-white/30 text-white font-medium text-base rounded-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 active:scale-95"
+          >
+            返回日曆
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   // 記錄心情頁面
   if (currentView === "record") {
     return (
@@ -454,6 +546,10 @@ const CuteMoodTracker = () => {
           onDateSelect={(selectedDate) => {
             setRecordingDate(selectedDate)
             setCurrentView("record")
+          }}
+          onEntryView={(entry) => {
+            setViewingEntry(entry)
+            setCurrentView("view")
           }}
         />
 
@@ -686,7 +782,14 @@ const CuteCharacter = ({ mood, size = 32, isToday = false }) => {
 
 // Apple Health風格年度視圖組件 - 手機優化版
 // Apple Health風格年度視圖組件 - 圓角方形設計
-const AppleHealthYearlyView = ({ moodHistory, moodOptions, currentDate, setCurrentDate, onDateSelect }) => {
+const AppleHealthYearlyView = ({
+  moodHistory,
+  moodOptions,
+  currentDate,
+  setCurrentDate,
+  onDateSelect,
+  onEntryView,
+}) => {
   const today = new Date()
   const currentYear = currentDate.getFullYear()
 
@@ -769,7 +872,7 @@ const AppleHealthYearlyView = ({ moodHistory, moodOptions, currentDate, setCurre
                 <div className="grid grid-cols-7 gap-x-3 gap-y-4">
                   {days.map((dayInfo, index) => {
                     if (!dayInfo) {
-                      return <div key={index} className="h-16" />
+                      return <div key={index} className="h-20" />
                     }
 
                     const moodEntry = getMoodForDate(dayInfo.year, dayInfo.month, dayInfo.day)
@@ -779,8 +882,16 @@ const AppleHealthYearlyView = ({ moodHistory, moodOptions, currentDate, setCurre
                       <button
                         key={index}
                         id={`date-${dayInfo.year}-${dayInfo.month}-${dayInfo.day}`}
-                        onClick={() => onDateSelect(new Date(dayInfo.year, dayInfo.month, dayInfo.day))}
-                        className="flex flex-col items-center space-y-2 date-button-mobile"
+                        onClick={() => {
+                          if (moodEntry) {
+                            // 如果已有記錄，顯示查看頁面
+                            onEntryView(moodEntry)
+                          } else {
+                            // 如果沒有記錄，進入記錄頁面
+                            onDateSelect(new Date(dayInfo.year, dayInfo.month, dayInfo.day))
+                          }
+                        }}
+                        className="flex flex-col items-center space-y-2 date-button-mobile group"
                       >
                         {/* 日期數字 */}
                         <span
@@ -791,13 +902,31 @@ const AppleHealthYearlyView = ({ moodHistory, moodOptions, currentDate, setCurre
                           {dayInfo.day}
                         </span>
 
-                        {/* 小人物心情指示器 */}
+                        {/* 心情指示器和筆記預覽 */}
                         <div className="relative">
                           {moodEntry ? (
-                            <CuteCharacter mood={moodEntry.mood} size={40} isToday={dayInfo.isToday} />
+                            <div className="flex flex-col items-center space-y-1">
+                              <CuteCharacter mood={moodEntry.mood} size={40} isToday={dayInfo.isToday} />
+
+                              {/* 筆記指示器 */}
+                              {moodEntry.notes && (
+                                <div className="w-full max-w-[60px]">
+                                  <div className="bg-gray-700 rounded-md px-2 py-1 text-xs text-gray-300 truncate group-hover:bg-gray-600 transition-colors">
+                                    {moodEntry.notes.length > 8
+                                      ? `${moodEntry.notes.substring(0, 8)}...`
+                                      : moodEntry.notes}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 心情標籤 */}
+                              <div className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {moodOption?.name}
+                              </div>
+                            </div>
                           ) : (
                             <div
-                              className={`w-10 h-10 rounded-xl border-2 transition-all duration-200 ${
+                              className={`w-10 h-10 rounded-xl border-2 transition-all duration-200 group-hover:border-gray-500 ${
                                 dayInfo.isToday ? "border-white border-4" : "border-gray-600"
                               }`}
                               style={{
@@ -835,12 +964,118 @@ const AppleHealthYearlyView = ({ moodHistory, moodOptions, currentDate, setCurre
   )
 }
 
-// 分析頁面組件
+// 分析頁面組件 - 個人化數據展示
 const AnalyticsView = ({ moodHistory, moodOptions, selectedTimeRange, setSelectedTimeRange }) => {
   const timeRanges = ["週", "月", "6個月", "年"]
 
+  // 計算統計數據
+  const getFilteredData = () => {
+    const now = new Date()
+    const startDate = new Date()
+
+    switch (selectedTimeRange) {
+      case "週":
+        startDate.setDate(now.getDate() - 7)
+        break
+      case "月":
+        startDate.setMonth(now.getMonth() - 1)
+        break
+      case "6個月":
+        startDate.setMonth(now.getMonth() - 6)
+        break
+      case "年":
+        startDate.setFullYear(now.getFullYear() - 1)
+        break
+    }
+
+    return moodHistory.filter((entry) => new Date(entry.date) >= startDate)
+  }
+
+  const filteredData = getFilteredData()
+  const hasData = filteredData.length > 0
+
+  // 計算平均心情
+  const averageMood = hasData ? filteredData.reduce((sum, entry) => sum + entry.mood, 0) / filteredData.length : 0
+
+  // 計算心情分布
+  const moodDistribution = filteredData.reduce(
+    (acc, entry) => {
+      acc[entry.mood] = (acc[entry.mood] || 0) + 1
+      return acc
+    },
+    {} as Record<number, number>,
+  )
+
+  // 計算筆記統計
+  const notesStats = {
+    totalWithNotes: filteredData.filter((entry) => entry.notes && entry.notes.trim()).length,
+    totalEntries: filteredData.length,
+    averageNoteLength:
+      filteredData
+        .filter((entry) => entry.notes && entry.notes.trim())
+        .reduce((sum, entry) => sum + (entry.notes?.length || 0), 0) /
+      Math.max(filteredData.filter((entry) => entry.notes && entry.notes.trim()).length, 1),
+  }
+
+  // 最常見的心情
+  const mostCommonMood = Object.entries(moodDistribution).sort(([, a], [, b]) => b - a)[0]
+
+  // 心情趨勢（最近7天）
+  const recentTrend = filteredData.slice(-7).map((entry) => ({
+    date: new Date(entry.date).toLocaleDateString("zh-TW", { month: "short", day: "numeric" }),
+    mood: entry.mood,
+    hasNotes: !!(entry.notes && entry.notes.trim()),
+  }))
+
+  const moodLabels = {
+    1: "很難過",
+    2: "有點難過",
+    3: "還好",
+    4: "開心",
+    5: "超開心",
+  }
+
+  const moodColors = {
+    1: "#8B5CF6", // 紫色
+    2: "#3B82F6", // 藍色
+    3: "#10B981", // 綠色
+    4: "#F59E0B", // 橙色
+    5: "#EF4444", // 紅色
+  }
+
+  if (!hasData) {
+    return (
+      <div className="p-4 space-y-6 pb-20">
+        <div className="flex bg-gray-700 rounded-xl p-1">
+          {timeRanges.map((range) => (
+            <button
+              key={range}
+              onClick={() => setSelectedTimeRange(range)}
+              className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-all ${
+                selectedTimeRange === range ? "bg-gray-600 text-white" : "text-gray-400 hover:text-white"
+              }`}
+            >
+              {range}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-3">
+          <h2 className="text-xl font-bold">沒有資料</h2>
+          <p className="text-gray-400 text-sm">開始記錄你的心情來查看個人化分析</p>
+        </div>
+
+        <div className="bg-gray-800 rounded-xl p-8 text-center">
+          <div className="text-6xl mb-4">📊</div>
+          <p className="text-gray-400">記錄更多心情後，這裡會顯示你的個人化圖表和洞察</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-4 space-y-6 pb-20">
+      {/* 時間範圍選擇器 */}
       <div className="flex bg-gray-700 rounded-xl p-1">
         {timeRanges.map((range) => (
           <button
@@ -855,60 +1090,118 @@ const AnalyticsView = ({ moodHistory, moodOptions, selectedTimeRange, setSelecte
         ))}
       </div>
 
-      <div className="space-y-3">
-        <h2 className="text-xl font-bold">沒有資料</h2>
-        <p className="text-gray-400 text-sm">2025年7月9日至15日</p>
-      </div>
-
-      <div className="bg-gray-800 rounded-xl p-4 space-y-4">
-        <div className="flex justify-between items-center">
-          <div className="space-y-2 text-xs">
-            <div className="text-gray-400">週三</div>
-            <div className="text-gray-400">週四</div>
-            <div className="text-gray-400">週五</div>
-            <div className="text-gray-400">週六</div>
-            <div className="text-gray-400">週日</div>
-            <div className="text-gray-400">週一</div>
-            <div className="text-gray-400">週二</div>
-          </div>
-
-          <div className="flex-1 mx-3">
-            <div className="grid grid-rows-7 gap-1 h-32">
-              {[...Array(7)].map((_, i) => (
-                <div key={i} className="border-t border-gray-700 border-dashed" />
-              ))}
+      {/* 概覽統計 */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-gray-800 rounded-xl p-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-400">{averageMood.toFixed(1)}</div>
+            <div className="text-sm text-gray-400">平均心情</div>
+            <div className="text-xs text-gray-500 mt-1">
+              {mostCommonMood ? moodLabels[Number(mostCommonMood[0]) as keyof typeof moodLabels] : ""}
             </div>
           </div>
+        </div>
 
-          <div className="space-y-3 text-xs text-gray-400">
-            <div>非常愉快</div>
-            <div className="mt-6">中性</div>
-            <div className="mt-6">非常不愉快</div>
+        <div className="bg-gray-800 rounded-xl p-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-400">{filteredData.length}</div>
+            <div className="text-sm text-gray-400">記錄天數</div>
+            <div className="text-xs text-gray-500 mt-1">{notesStats.totalWithNotes} 天有筆記</div>
           </div>
         </div>
       </div>
 
-      <div className="flex bg-gray-700 rounded-xl">
-        {["狀態", "關聯性", "生活因素"].map((tab, index) => (
-          <button
-            key={tab}
-            className={`flex-1 py-3 px-2 text-sm font-medium ${
-              index === 0 ? "bg-gray-600 text-white rounded-xl" : "text-gray-400"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+      {/* 心情分布圖 */}
+      <div className="bg-gray-800 rounded-xl p-4">
+        <h3 className="text-lg font-semibold mb-4">心情分布</h3>
+        <div className="space-y-3">
+          {Object.entries(moodDistribution)
+            .sort(([a], [b]) => Number(b) - Number(a))
+            .map(([mood, count]) => {
+              const percentage = ((count / filteredData.length) * 100).toFixed(1)
+              const moodNum = Number(mood) as keyof typeof moodLabels
+              return (
+                <div key={mood} className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: moodColors[moodNum] }} />
+                      {moodLabels[moodNum]}
+                    </span>
+                    <span>
+                      {count} 天 ({percentage}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${percentage}%`,
+                        backgroundColor: moodColors[moodNum],
+                      }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+        </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="bg-gray-800 rounded-xl p-4 flex justify-between items-center">
-          <span className="text-white text-sm">整天心情</span>
-          <span className="text-gray-400">--</span>
+      {/* 最近趨勢 */}
+      {recentTrend.length > 0 && (
+        <div className="bg-gray-800 rounded-xl p-4">
+          <h3 className="text-lg font-semibold mb-4">最近趨勢</h3>
+          <div className="space-y-3">
+            {recentTrend.map((day, index) => (
+              <div key={index} className="flex items-center justify-between">
+                <span className="text-sm text-gray-400">{day.date}</span>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: moodColors[day.mood as keyof typeof moodColors] }}
+                  />
+                  <span className="text-sm">{moodLabels[day.mood as keyof typeof moodLabels]}</span>
+                  {day.hasNotes && <div className="w-2 h-2 bg-yellow-400 rounded-full" title="有筆記" />}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="bg-gray-800 rounded-xl p-4 flex justify-between items-center">
-          <span className="text-white text-sm">時刻情緒</span>
-          <span className="text-gray-400">--</span>
+      )}
+
+      {/* 筆記統計 */}
+      <div className="bg-gray-800 rounded-xl p-4">
+        <h3 className="text-lg font-semibold mb-4">筆記統計</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="text-center">
+            <div className="text-xl font-bold text-yellow-400">
+              {((notesStats.totalWithNotes / notesStats.totalEntries) * 100).toFixed(0)}%
+            </div>
+            <div className="text-sm text-gray-400">記錄率</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-purple-400">{Math.round(notesStats.averageNoteLength)}</div>
+            <div className="text-sm text-gray-400">平均字數</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 洞察建議 */}
+      <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-xl p-4 border border-blue-800/30">
+        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+          <span>💡</span>
+          個人洞察
+        </h3>
+        <div className="text-sm text-gray-300 space-y-2">
+          {averageMood >= 4 && <p>• 你的整體心情很不錯！繼續保持積極的生活態度。</p>}
+          {averageMood < 3 && <p>• 最近心情似乎不太好，記得照顧好自己，必要時尋求支持。</p>}
+          {notesStats.totalWithNotes / notesStats.totalEntries > 0.7 && (
+            <p>• 你很善於記錄想法，這有助於更好地了解自己的情緒模式。</p>
+          )}
+          {mostCommonMood && (
+            <p>
+              • 你最常感到「{moodLabels[Number(mostCommonMood[0]) as keyof typeof moodLabels]}」，這反映了你的整體狀態。
+            </p>
+          )}
         </div>
       </div>
     </div>
